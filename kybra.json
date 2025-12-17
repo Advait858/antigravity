@@ -1,0 +1,8 @@
+{
+    "python_version": "3.10.7",
+    "canisters": {
+        "antigravity_bot": {
+            "source": "src/main.py"
+        }
+    }
+}
