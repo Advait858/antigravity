@@ -1,25 +1,8 @@
 {
-  "version": 1,
-  "canisters": {
-    "antigravity_bot": {
-      "type": "custom",
-      "build": "python -m kybra antigravity_bot src/main.py antigravity_bot.did",
-      "candid": "antigravity_bot.did",
-      "wasm": ".kybra/antigravity_bot/antigravity_bot.wasm",
-      "gzip": true
+    "canisters": {
+        "antigravity_bot": {
+            "type": "kybra",
+            "main": "src/main.py"
+        }
     }
-  },
-  "defaults": {
-    "build": {
-      "args": "",
-      "packtool": ""
-    }
-  },
-  "output_env_file": ".env",
-  "networks": {
-    "local": {
-      "bind": "127.0.0.1:4943",
-      "type": "ephemeral"
-    }
-  }
 }
