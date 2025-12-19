@@ -6,7 +6,7 @@ or external HTTPS outcalls to fetch real price data.
 """
 
 import numpy as np
-from typing import List, Optional
+from typing import List, Optional, Tuple, Dict
 
 
 def fetch_candles(
@@ -80,7 +80,7 @@ def fetch_candles_cointegrated(
     num_candles: int = 100,
     seed: int = 42,
     cointegration_strength: float = 0.8
-) -> tuple:
+) -> Tuple[List[float], List[float]]:
     """
     Fetch mock price data for two cointegrated assets.
     
@@ -129,7 +129,7 @@ def fetch_candles_cointegrated(
 
 
 # Convenience function for quick testing
-def get_sample_data() -> dict:
+def get_sample_data() -> Dict[str, any]:
     """
     Get sample price data for quick testing.
     
@@ -143,3 +143,17 @@ def get_sample_data() -> dict:
         "timestamp": "2024-12-17T00:00:00Z",
         "source": "mock_data"
     }
+
+
+if __name__ == "__main__":
+    # Test the functions
+    print("Testing data loader...")
+    
+    btc_prices = fetch_candles("BTC", 50, seed=42)
+    print(f"BTC: {len(btc_prices)} prices, range ${min(btc_prices):.0f} - ${max(btc_prices):.0f}")
+    
+    btc, icp = fetch_candles_cointegrated()
+    print(f"Cointegrated pair: BTC ({len(btc)} pts), ICP ({len(icp)} pts)")
+    
+    sample = get_sample_data()
+    print(f"Sample data: {list(sample.keys())}")

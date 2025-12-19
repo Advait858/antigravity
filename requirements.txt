@@ -1,3 +1,6 @@
+# Antigravity Bot - Requirements
+# For local development and backtesting
+
 kybra
 numpy
 statsmodels
