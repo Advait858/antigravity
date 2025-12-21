@@ -1,29 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Antigravity | AI Trading Agent</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
     <!-- Ambient Background -->
     <div class="ambient-bg"></div>
-    
+
     <!-- Header -->
     <header class="header">
         <div class="logo">
             <span class="logo-icon">🚀</span>
             <span class="logo-text">Antigravity</span>
-            <span class="version-badge">v5.0</span>
+            <span class="version-badge">v5.1</span>
         </div>
         <div class="header-right">
             <div class="status-indicator">
                 <span class="status-dot"></span>
-                <span class="status-text">Agent Active</span>
+                <span class="status-text" id="agentStatus">Agent Active</span>
+            </div>
+            <div class="update-timer">
+                <span id="nextUpdate">60s</span>
             </div>
             <button class="btn-connect" id="connectBtn">
                 <span class="wallet-icon">👛</span>
@@ -34,69 +41,63 @@
 
     <!-- Main Dashboard -->
     <main class="dashboard">
-        <!-- Stats Row -->
-        <section class="stats-row">
-            <div class="stat-card">
-                <div class="stat-icon">📊</div>
-                <div class="stat-content">
-                    <span class="stat-value" id="pairsAnalyzed">45</span>
-                    <span class="stat-label">Pairs Analyzed</span>
+        <!-- Portfolio Row -->
+        <section class="portfolio-row">
+            <div class="portfolio-card">
+                <div class="portfolio-header">
+                    <h2>💼 Portfolio</h2>
+                    <span class="portfolio-mode">Paper Trading</span>
                 </div>
-            </div>
-            <div class="stat-card highlight">
-                <div class="stat-icon">🔗</div>
-                <div class="stat-content">
-                    <span class="stat-value" id="cointegratedPairs">--</span>
-                    <span class="stat-label">Cointegrated</span>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">🎯</div>
-                <div class="stat-content">
-                    <span class="stat-value" id="activeSignals">--</span>
-                    <span class="stat-label">Active Signals</span>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">⏱️</div>
-                <div class="stat-content">
-                    <span class="stat-value" id="lastUpdate">--</span>
-                    <span class="stat-label">Last Update</span>
+                <div class="portfolio-stats">
+                    <div class="portfolio-stat main">
+                        <span class="portfolio-label">Total Value</span>
+                        <span class="portfolio-value" id="totalValue">$100,000.00</span>
+                    </div>
+                    <div class="portfolio-stat">
+                        <span class="portfolio-label">Cash</span>
+                        <span class="portfolio-value" id="cashValue">$100,000.00</span>
+                    </div>
+                    <div class="portfolio-stat">
+                        <span class="portfolio-label">P&L</span>
+                        <span class="portfolio-value pnl" id="pnlValue">$0.00</span>
+                    </div>
+                    <div class="portfolio-stat">
+                        <span class="portfolio-label">Open Positions</span>
+                        <span class="portfolio-value" id="positionsCount">0</span>
+                    </div>
                 </div>
             </div>
         </section>
 
-        <!-- Main Content Grid -->
-        <div class="content-grid">
-            <!-- Trading Signals Panel -->
-            <section class="panel signals-panel">
-                <div class="panel-header">
-                    <h2>🎯 Trading Signals</h2>
-                    <button class="btn-refresh" id="refreshSignals">
-                        <span class="refresh-icon">↻</span>
-                    </button>
+        <!-- Trade Proposals Section -->
+        <section class="panel proposals-panel">
+            <div class="panel-header">
+                <h2>🎯 Trade Proposals</h2>
+                <div class="panel-actions">
+                    <span class="proposal-count" id="proposalCount">0 active</span>
+                    <button class="btn-refresh" id="refreshProposals">↻</button>
                 </div>
-                <div class="signals-container" id="signalsContainer">
-                    <div class="loading-state">
-                        <div class="spinner"></div>
-                        <p>Loading signals...</p>
-                    </div>
+            </div>
+            <div class="proposals-container" id="proposalsContainer">
+                <div class="loading-state">
+                    <div class="spinner"></div>
+                    <p>Analyzing markets...</p>
                 </div>
-            </section>
+            </div>
+        </section>
 
-            <!-- Cointegrated Pairs Panel -->
-            <section class="panel pairs-panel">
-                <div class="panel-header">
-                    <h2>🔗 Cointegrated Pairs</h2>
+        <!-- Active Trades -->
+        <section class="panel trades-panel">
+            <div class="panel-header">
+                <h2>📊 Active Trades</h2>
+            </div>
+            <div class="trades-container" id="tradesContainer">
+                <div class="empty-state">
+                    <div class="empty-state-icon">📭</div>
+                    <p>No active trades yet</p>
                 </div>
-                <div class="pairs-container" id="pairsContainer">
-                    <div class="loading-state">
-                        <div class="spinner"></div>
-                        <p>Analyzing pairs...</p>
-                    </div>
-                </div>
-            </section>
-        </div>
+            </div>
+        </section>
 
         <!-- Live Prices Row -->
         <section class="panel prices-panel">
@@ -107,42 +108,33 @@
                     LIVE
                 </span>
             </div>
-            <div class="prices-grid" id="pricesGrid">
-                <!-- Prices will be populated here -->
-            </div>
-        </section>
-
-        <!-- Analysis Details -->
-        <section class="panel analysis-panel">
-            <div class="panel-header">
-                <h2>📈 Strategy Analysis</h2>
-            </div>
-            <div class="analysis-content">
-                <div class="analysis-item">
-                    <span class="analysis-label">Strategy</span>
-                    <span class="analysis-value">Engle-Granger Cointegration</span>
-                </div>
-                <div class="analysis-item">
-                    <span class="analysis-label">Assets Tracked</span>
-                    <span class="analysis-value">BTC, ETH, SOL, XRP, DOGE, ADA, AVAX, DOT, LINK, ICP</span>
-                </div>
-                <div class="analysis-item">
-                    <span class="analysis-label">Rolling Windows</span>
-                    <span class="analysis-value">30, 60, 90, 180 days</span>
-                </div>
-                <div class="analysis-item">
-                    <span class="analysis-label">Entry Threshold</span>
-                    <span class="analysis-value">|Z-Score| > 2σ</span>
-                </div>
-            </div>
+            <div class="prices-grid" id="pricesGrid"></div>
         </section>
     </main>
 
+    <!-- Trade Confirmation Modal -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal" id="tradeModal">
+            <div class="modal-header">
+                <h3>⚡ Execute Trade</h3>
+                <button class="modal-close" id="modalClose">×</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Trade details will be inserted here -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn-reject" id="btnReject">❌ Reject</button>
+                <button class="btn-accept" id="btnAccept">✅ Execute Trade</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Footer -->
     <footer class="footer">
-        <p>Powered by <strong>Internet Computer Protocol</strong> • Built for Zo House Hackathon 2024</p>
+        <p>Powered by <strong>Internet Computer Protocol</strong> • AI-Driven Statistical Arbitrage</p>
     </footer>
 
     <script src="app.js"></script>
 </body>
+
 </html>
