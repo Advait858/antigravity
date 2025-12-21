@@ -1,65 +1,53 @@
 #!/bin/bash
-# Test script for Antigravity v3.0 Multi-Asset Agent
+# Antigravity v5.0 - Load historical data and run analysis
 source ~/.local/share/dfx/env
 cd /mnt/c/Users/ADVAIT/.gemini/antigravity/scratch/antigravity
 
 echo "========================================"
-echo "ANTIGRAVITY v3.0 MULTI-ASSET TEST"
+echo "ANTIGRAVITY v5.0 - LOADING HISTORICAL DATA"
 echo "========================================"
 
 echo ""
-echo "1. Health Check:"
-dfx canister call antigravity_bot get_health
-
-echo ""
-echo "2. Version:"
+echo "1. Version:"
 dfx canister call antigravity_bot get_version
 
 echo ""
-echo "3. Strategy Info:"
-dfx canister call antigravity_bot get_strategy_info
+echo "2. Loading 1-year data for BTC..."
+dfx canister call antigravity_bot 'fetch_ohlcv_data("bitcoin")'
 
 echo ""
-echo "4. Config (tracked assets):"
-dfx canister call antigravity_bot get_config
+echo "3. Loading 1-year data for ETH..."
+dfx canister call antigravity_bot 'fetch_ohlcv_data("ethereum")'
 
 echo ""
-echo "5. Who Am I (Principal ID):"
-dfx canister call antigravity_bot whoami
+echo "4. Loading 1-year data for SOL..."
+dfx canister call antigravity_bot 'fetch_ohlcv_data("solana")'
 
 echo ""
-echo "6. Register Wallet:"
-dfx canister call antigravity_bot register_wallet
+echo "5. Loading 1-year data for ICP..."
+dfx canister call antigravity_bot 'fetch_ohlcv_data("internet-computer")'
 
 echo ""
-echo "7. Fetch All Top 10 Prices:"
-dfx canister call antigravity_bot fetch_all_prices
+echo "6. Data Status:"
+dfx canister call antigravity_bot get_data_status
 
 echo ""
-echo "8. Get Top 10 Prices:"
-dfx canister call antigravity_bot get_top_10_prices
+echo "7. Running Analysis..."
+dfx canister call antigravity_bot run_analysis
 
 echo ""
-echo "9. Fetch and Analyze (with recommendations):"
-dfx canister call antigravity_bot fetch_and_analyze
+echo "8. Cointegrated Pairs:"
+dfx canister call antigravity_bot get_cointegrated_pairs
 
 echo ""
-echo "10. Get Recommendations:"
-dfx canister call antigravity_bot get_recommendations
+echo "9. Trading Signals:"
+dfx canister call antigravity_bot get_trading_signals
 
 echo ""
-echo "11. Get Portfolio Analysis:"
-dfx canister call antigravity_bot get_portfolio_analysis
-
-echo ""
-echo "12. Get BTC History:"
-dfx canister call antigravity_bot 'get_asset_history("BTC")'
-
-echo ""
-echo "13. Get State:"
+echo "10. State:"
 dfx canister call antigravity_bot get_state
 
 echo ""
 echo "========================================"
-echo "TEST COMPLETE"
+echo "COMPLETE"
 echo "========================================"
