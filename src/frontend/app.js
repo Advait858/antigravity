@@ -16,7 +16,8 @@ const CONFIG = {
     icpHost: 'http://127.0.0.1:8080',
 
     // Update intervals
-    priceUpdateInterval: 5000,  // 5 seconds
+    priceUpdateInterval: 3000,  // 3 seconds for prices
+    pnlUpdateInterval: 1000,    // 1 second for P&L
     chartUpdateInterval: 60000, // 1 minute
 
     // Asset mapping for CoinGecko
@@ -267,39 +268,9 @@ function generateSignals() {
         }
     }
 
-    // Always show at least 2 sample signals for demo
-    if (signals.length < 2) {
-        signals.push({
-            pair: 'SOL/LINK',
-            assetA: 'SOL',
-            assetB: 'LINK',
-            action: 'LONG',
-            zScore: '-2.1',
-            halfLife: '5.2',
-            confidence: 75,
-            priceA: prices.SOL || 126,
-            priceB: prices.LINK || 23,
-            changeA: (priceChanges.SOL || -1.5).toFixed(2),
-            changeB: (priceChanges.LINK || 0.8).toFixed(2),
-            spreadChange: '-2.3',
-            timestamp: Date.now()
-        });
-
-        signals.push({
-            pair: 'ETH/DOT',
-            assetA: 'ETH',
-            assetB: 'DOT',
-            action: 'SHORT',
-            zScore: '1.8',
-            halfLife: '8.7',
-            confidence: 65,
-            priceA: prices.ETH || 2980,
-            priceB: prices.DOT || 7.2,
-            changeA: (priceChanges.ETH || 2.1).toFixed(2),
-            changeB: (priceChanges.DOT || -0.5).toFixed(2),
-            spreadChange: '2.6',
-            timestamp: Date.now()
-        });
+    // Only show signals that pass the threshold - no fake data
+    if (signals.length === 0) {
+        console.log('No signals meet threshold. Waiting for market opportunity...');
     }
 
     renderSignals();
@@ -388,17 +359,36 @@ function renderTrades() {
         return;
     }
 
-    container.innerHTML = activeTrades.map(t => {
+    container.innerHTML = activeTrades.map((t, idx) => {
         const currentPnl = calculateTradePnl(t);
+        const pnlPct = ((currentPnl / t.amount) * 100).toFixed(2);
+        const holdTime = Math.floor((Date.now() - t.timestamp) / 1000);
+        const holdTimeStr = holdTime < 60 ? `${holdTime}s` : `${Math.floor(holdTime / 60)}m ${holdTime % 60}s`;
+
         return `
-            <div class="trade-item">
-                <div>
-                    <strong>${t.pair}</strong>
-                    <span style="color: var(--text-muted); font-size: 0.65rem;">${t.action}</span>
+            <div class="trade-item" style="flex-direction: column; gap: 0.5rem;">
+                <div style="display: flex; justify-content: space-between; width: 100%;">
+                    <div>
+                        <strong>${t.pair}</strong>
+                        <span style="color: var(--text-muted); font-size: 0.6rem; margin-left: 0.5rem;">${t.action}</span>
+                    </div>
+                    <span class="${currentPnl >= 0 ? 'positive' : 'negative'}" style="font-weight: 600;">
+                        ${currentPnl >= 0 ? '+' : ''}$${currentPnl.toFixed(2)} (${currentPnl >= 0 ? '+' : ''}${pnlPct}%)
+                    </span>
                 </div>
-                <span class="${currentPnl >= 0 ? 'positive' : 'negative'}">
-                    ${currentPnl >= 0 ? '+' : ''}$${currentPnl.toFixed(2)}
-                </span>
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <span style="font-size: 0.6rem; color: var(--text-muted);">Hold: ${holdTimeStr} | Entry: $${t.amount}</span>
+                    <button onclick="closeTrade(${idx})" style="
+                        background: #f6465d;
+                        border: none;
+                        color: white;
+                        padding: 0.25rem 0.5rem;
+                        border-radius: 3px;
+                        font-size: 0.65rem;
+                        cursor: pointer;
+                        font-weight: 600;
+                    ">CLOSE</button>
+                </div>
             </div>
         `;
     }).join('');
@@ -488,13 +478,17 @@ function calculateTradePnl(trade) {
 // ============================================================
 
 function startRealTimeUpdates() {
-    // Update prices every 5 seconds
+    // Update P&L every second (fast updates)
+    setInterval(() => {
+        renderTrades();
+        updatePortfolioUI();
+    }, CONFIG.pnlUpdateInterval);
+
+    // Update prices every 3 seconds
     setInterval(async () => {
         await fetchAllPrices();
         renderAssetList();
         updateSelectedAssetUI();
-        renderTrades();
-        updatePortfolioUI();
     }, CONFIG.priceUpdateInterval);
 
     // Update chart every minute
@@ -507,6 +501,31 @@ function startRealTimeUpdates() {
         generateSignals();
     }, 30000);
 }
+
+// ============================================================
+// CLOSE TRADE
+// ============================================================
+
+function closeTrade(index) {
+    const trade = activeTrades[index];
+    if (!trade) return;
+
+    const pnl = calculateTradePnl(trade);
+
+    // Return capital + P&L to cash
+    portfolio.cash += trade.amount + pnl;
+
+    // Remove trade
+    activeTrades.splice(index, 1);
+
+    // Update UI
+    renderTrades();
+    updatePortfolioUI();
+
+    showNotification(`Closed ${trade.pair}: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} P&L`);
+}
+
+window.closeTrade = closeTrade;
 
 // ============================================================
 // EVENT HANDLERS
