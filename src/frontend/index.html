@@ -10,128 +10,171 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
         rel="stylesheet">
+    <!-- TradingView Lightweight Charts -->
+    <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
     <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
-    <!-- Ambient Background -->
-    <div class="ambient-bg"></div>
-
     <!-- Header -->
     <header class="header">
         <div class="logo">
             <span class="logo-icon">🚀</span>
-            <span class="logo-text">Antigravity</span>
-            <span class="version-badge">v5.1</span>
+            <span class="logo-text">ANTIGRAVITY</span>
         </div>
+        <nav class="nav-tabs">
+            <button class="nav-tab active" data-tab="trading">Trading</button>
+            <button class="nav-tab" data-tab="analysis">Analysis</button>
+            <button class="nav-tab" data-tab="portfolio">Portfolio</button>
+        </nav>
         <div class="header-right">
-            <div class="status-indicator">
-                <span class="status-dot"></span>
-                <span class="status-text" id="agentStatus">Agent Active</span>
+            <div class="connection-status" id="connectionStatus">
+                <span class="status-dot offline"></span>
+                <span>Disconnected</span>
             </div>
-            <div class="update-timer">
-                <span id="nextUpdate">60s</span>
-            </div>
-            <button class="btn-connect" id="connectBtn">
-                <span class="wallet-icon">👛</span>
-                Connect Wallet
-            </button>
+            <button class="btn-primary" id="connectBtn">Connect to ICP</button>
         </div>
     </header>
 
-    <!-- Main Dashboard -->
-    <main class="dashboard">
-        <!-- Portfolio Row -->
-        <section class="portfolio-row">
-            <div class="portfolio-card">
-                <div class="portfolio-header">
-                    <h2>💼 Portfolio</h2>
-                    <span class="portfolio-mode">Paper Trading</span>
-                </div>
-                <div class="portfolio-stats">
-                    <div class="portfolio-stat main">
-                        <span class="portfolio-label">Total Value</span>
-                        <span class="portfolio-value" id="totalValue">$100,000.00</span>
-                    </div>
-                    <div class="portfolio-stat">
-                        <span class="portfolio-label">Cash</span>
-                        <span class="portfolio-value" id="cashValue">$100,000.00</span>
-                    </div>
-                    <div class="portfolio-stat">
-                        <span class="portfolio-label">P&L</span>
-                        <span class="portfolio-value pnl" id="pnlValue">$0.00</span>
-                    </div>
-                    <div class="portfolio-stat">
-                        <span class="portfolio-label">Open Positions</span>
-                        <span class="portfolio-value" id="positionsCount">0</span>
-                    </div>
-                </div>
+    <!-- Main Layout -->
+    <div class="main-layout">
+        <!-- Left Sidebar - Asset List -->
+        <aside class="sidebar-left">
+            <div class="sidebar-header">
+                <h3>Markets</h3>
+                <span class="live-badge">LIVE</span>
             </div>
-        </section>
+            <div class="asset-list" id="assetList">
+                <!-- Assets will be populated here -->
+            </div>
+        </aside>
 
-        <!-- Trade Proposals Section -->
-        <section class="panel proposals-panel">
-            <div class="panel-header">
-                <h2>🎯 Trade Proposals</h2>
-                <div class="panel-actions">
-                    <span class="proposal-count" id="proposalCount">0 active</span>
-                    <button class="btn-refresh" id="refreshProposals">↻</button>
+        <!-- Center - Chart & Orders -->
+        <main class="main-content">
+            <!-- Chart Section -->
+            <section class="chart-section">
+                <div class="chart-header">
+                    <div class="chart-pair">
+                        <span class="pair-name" id="selectedPair">BTC/USD</span>
+                        <span class="pair-price positive" id="selectedPrice">$0.00</span>
+                        <span class="pair-change" id="selectedChange">+0.00%</span>
+                    </div>
+                    <div class="chart-controls">
+                        <button class="time-btn active" data-tf="1h">1H</button>
+                        <button class="time-btn" data-tf="4h">4H</button>
+                        <button class="time-btn" data-tf="1d">1D</button>
+                        <button class="time-btn" data-tf="1w">1W</button>
+                    </div>
+                </div>
+                <div class="chart-container" id="priceChart"></div>
+            </section>
+
+            <!-- Trade Signals -->
+            <section class="signals-section">
+                <div class="section-header">
+                    <h3>🤖 AI Trade Signals</h3>
+                    <button class="btn-refresh" id="refreshSignals">⟳ Refresh</button>
+                </div>
+                <div class="signals-grid" id="signalsGrid">
+                    <div class="loading-state">
+                        <div class="spinner"></div>
+                        <p>Loading signals from canister...</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Right Sidebar - Order Panel -->
+        <aside class="sidebar-right">
+            <div class="order-panel">
+                <div class="order-header">
+                    <h3>Place Order</h3>
+                </div>
+                <div class="order-tabs">
+                    <button class="order-tab active" data-type="market">AI Signal</button>
+                    <button class="order-tab" data-type="limit">Manual</button>
+                </div>
+                <div class="order-form" id="orderForm">
+                    <div class="form-group">
+                        <label>Pair</label>
+                        <select id="orderPair">
+                            <option value="SOL/LINK">SOL/LINK</option>
+                            <option value="ETH/DOT">ETH/DOT</option>
+                            <option value="BTC/ICP">BTC/ICP</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Action</label>
+                        <div class="action-btns">
+                            <button class="action-btn buy active">LONG</button>
+                            <button class="action-btn sell">SHORT</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Amount (USD)</label>
+                        <input type="number" id="orderAmount" value="1000" step="100">
+                    </div>
+                    <div class="order-summary">
+                        <div class="summary-row">
+                            <span>Est. Entry</span>
+                            <span id="estEntry">--</span>
+                        </div>
+                        <div class="summary-row">
+                            <span>Target (+3%)</span>
+                            <span id="estTarget" class="positive">--</span>
+                        </div>
+                        <div class="summary-row">
+                            <span>Stop Loss (-5%)</span>
+                            <span id="estStop" class="negative">--</span>
+                        </div>
+                    </div>
+                    <button class="btn-execute" id="executeBtn">Execute Trade</button>
                 </div>
             </div>
-            <div class="proposals-container" id="proposalsContainer">
-                <div class="loading-state">
-                    <div class="spinner"></div>
-                    <p>Analyzing markets...</p>
+
+            <!-- Active Trades -->
+            <div class="active-trades-panel">
+                <div class="panel-header">
+                    <h3>Active Trades</h3>
+                    <span class="trade-count" id="tradeCount">0</span>
+                </div>
+                <div class="trades-list" id="tradesList">
+                    <div class="empty-state-small">No active trades</div>
                 </div>
             </div>
-        </section>
 
-        <!-- Active Trades -->
-        <section class="panel trades-panel">
-            <div class="panel-header">
-                <h2>📊 Active Trades</h2>
-            </div>
-            <div class="trades-container" id="tradesContainer">
-                <div class="empty-state">
-                    <div class="empty-state-icon">📭</div>
-                    <p>No active trades yet</p>
+            <!-- Portfolio Summary -->
+            <div class="portfolio-summary">
+                <div class="portfolio-stat">
+                    <span class="stat-label">Balance</span>
+                    <span class="stat-value" id="portfolioBalance">$100,000.00</span>
+                </div>
+                <div class="portfolio-stat">
+                    <span class="stat-label">P&L</span>
+                    <span class="stat-value pnl" id="portfolioPnl">$0.00</span>
                 </div>
             </div>
-        </section>
-
-        <!-- Live Prices Row -->
-        <section class="panel prices-panel">
-            <div class="panel-header">
-                <h2>💰 Live Prices</h2>
-                <span class="live-indicator">
-                    <span class="pulse"></span>
-                    LIVE
-                </span>
-            </div>
-            <div class="prices-grid" id="pricesGrid"></div>
-        </section>
-    </main>
-
-    <!-- Trade Confirmation Modal -->
-    <div class="modal-overlay" id="modalOverlay">
-        <div class="modal" id="tradeModal">
-            <div class="modal-header">
-                <h3>⚡ Execute Trade</h3>
-                <button class="modal-close" id="modalClose">×</button>
-            </div>
-            <div class="modal-body" id="modalBody">
-                <!-- Trade details will be inserted here -->
-            </div>
-            <div class="modal-footer">
-                <button class="btn-reject" id="btnReject">❌ Reject</button>
-                <button class="btn-accept" id="btnAccept">✅ Execute Trade</button>
-            </div>
-        </div>
+        </aside>
     </div>
 
-    <!-- Footer -->
-    <footer class="footer">
-        <p>Powered by <strong>Internet Computer Protocol</strong> • AI-Driven Statistical Arbitrage</p>
+    <!-- Status Bar -->
+    <footer class="status-bar">
+        <div class="status-item">
+            <span class="status-label">ICP Canister:</span>
+            <span class="status-value" id="canisterStatus">Disconnected</span>
+        </div>
+        <div class="status-item">
+            <span class="status-label">Prices:</span>
+            <span class="status-value" id="priceSource">CoinGecko Live</span>
+        </div>
+        <div class="status-item">
+            <span class="status-label">Last Update:</span>
+            <span class="status-value" id="lastUpdate">--</span>
+        </div>
+        <div class="status-item">
+            <span class="status-label">Pairs Analyzed:</span>
+            <span class="status-value" id="pairsAnalyzed">0/45</span>
+        </div>
     </footer>
 
     <script src="app.js"></script>
