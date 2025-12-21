@@ -93,6 +93,31 @@ last_update_time: int = 0
 registered_users: list = []
 execution_logs: list = []
 
+# ============================================================================
+# TRADE EXECUTION STATE (Paper Trading)
+# ============================================================================
+
+# Portfolio: Starting balance for paper trading
+INITIAL_BALANCE = 100000.0  # $100,000 paper money
+
+portfolio: dict = {
+    "cash": INITIAL_BALANCE,
+    "positions": {},  # {asset: {"quantity": float, "avg_price": float, "side": "long"/"short"}}
+    "total_value": INITIAL_BALANCE,
+    "pnl": 0.0,
+    "pnl_pct": 0.0
+}
+
+# Trade history
+trade_history: list = []  # List of executed trades
+
+# Active positions from pair trades
+active_pair_trades: list = []  # [{pair, entry_time, entry_z, positions, status}]
+
+# Auto-execute mode
+auto_execute_enabled: bool = True
+max_position_size: float = 10000.0  # Max $10k per trade
+
 
 # ============================================================================
 # Statistical Functions
@@ -1041,4 +1066,369 @@ def load_sample_data() -> str:
         "data_points_per_asset": n_days,
         "analysis_result": result
     })
+
+
+# ============================================================================
+# TRADE EXECUTION FUNCTIONS
+# ============================================================================
+
+def calculate_portfolio_value() -> float:
+    """Calculate total portfolio value including positions."""
+    global portfolio
+    total = portfolio["cash"]
+    
+    for asset, pos in portfolio["positions"].items():
+        current_price = current_prices.get(asset, pos["avg_price"])
+        if pos["side"] == "long":
+            total += pos["quantity"] * current_price
+        else:  # short
+            # Short P&L = (entry_price - current_price) * quantity
+            total += pos["quantity"] * (2 * pos["avg_price"] - current_price)
+    
+    portfolio["total_value"] = total
+    portfolio["pnl"] = total - INITIAL_BALANCE
+    portfolio["pnl_pct"] = (portfolio["pnl"] / INITIAL_BALANCE) * 100
+    
+    return total
+
+
+def execute_single_trade(asset: str, side: str, quantity: float, price: float) -> dict:
+    """Execute a single trade (buy/sell an asset)."""
+    global portfolio, trade_history
+    
+    trade_value = quantity * price
+    
+    if side == "buy":
+        if trade_value > portfolio["cash"]:
+            return {"success": False, "error": "Insufficient cash"}
+        
+        portfolio["cash"] -= trade_value
+        
+        if asset in portfolio["positions"]:
+            pos = portfolio["positions"][asset]
+            if pos["side"] == "long":
+                # Add to long position
+                total_qty = pos["quantity"] + quantity
+                pos["avg_price"] = (pos["avg_price"] * pos["quantity"] + price * quantity) / total_qty
+                pos["quantity"] = total_qty
+            else:
+                # Close short position
+                pos["quantity"] -= quantity
+                if pos["quantity"] <= 0:
+                    del portfolio["positions"][asset]
+        else:
+            portfolio["positions"][asset] = {
+                "quantity": quantity,
+                "avg_price": price,
+                "side": "long"
+            }
+    
+    elif side == "sell":
+        if asset in portfolio["positions"]:
+            pos = portfolio["positions"][asset]
+            if pos["side"] == "long":
+                pos["quantity"] -= quantity
+                portfolio["cash"] += trade_value
+                if pos["quantity"] <= 0:
+                    del portfolio["positions"][asset]
+            else:
+                # Add to short position
+                total_qty = pos["quantity"] + quantity
+                pos["avg_price"] = (pos["avg_price"] * pos["quantity"] + price * quantity) / total_qty
+                pos["quantity"] = total_qty
+                portfolio["cash"] += trade_value
+        else:
+            # Open short position
+            portfolio["positions"][asset] = {
+                "quantity": quantity,
+                "avg_price": price,
+                "side": "short"
+            }
+            portfolio["cash"] += trade_value
+    
+    trade = {
+        "id": len(trade_history) + 1,
+        "asset": asset,
+        "side": side,
+        "quantity": round(quantity, 6),
+        "price": price,
+        "value": round(trade_value, 2),
+        "timestamp": ic.time(),
+        "type": "single"
+    }
+    trade_history.append(trade)
+    
+    calculate_portfolio_value()
+    log_event("TRADE", f"Executed {side.upper()} {quantity:.4f} {asset} @ ${price:.2f}")
+    
+    return {"success": True, "trade": trade}
+
+
+def execute_pair_trade(signal: dict) -> dict:
+    """Execute a pairs trade based on a trading signal."""
+    global portfolio, trade_history, active_pair_trades
+    
+    asset_a = signal.get("asset_a", signal["pair"].split("/")[0])
+    asset_b = signal.get("asset_b", signal["pair"].split("/")[1])
+    action = signal["action"]
+    
+    price_a = current_prices.get(asset_a, 0)
+    price_b = current_prices.get(asset_b, 0)
+    
+    if price_a == 0 or price_b == 0:
+        return {"success": False, "error": "Missing price data"}
+    
+    # Calculate position sizes (equal dollar value)
+    position_value = min(max_position_size, portfolio["cash"] * 0.2)  # 20% of cash max
+    qty_a = position_value / price_a
+    qty_b = position_value / price_b
+    
+    if action == "LONG_SPREAD":
+        # Long A, Short B
+        result_a = execute_single_trade(asset_a, "buy", qty_a, price_a)
+        result_b = execute_single_trade(asset_b, "sell", qty_b, price_b)
+    elif action == "SHORT_SPREAD":
+        # Short A, Long B
+        result_a = execute_single_trade(asset_a, "sell", qty_a, price_a)
+        result_b = execute_single_trade(asset_b, "buy", qty_b, price_b)
+    else:
+        return {"success": False, "error": f"Unknown action: {action}"}
+    
+    pair_trade = {
+        "id": len(active_pair_trades) + 1,
+        "pair": signal["pair"],
+        "action": action,
+        "entry_time": ic.time(),
+        "entry_z_score": signal.get("z_score", 0),
+        "entry_prices": {"a": price_a, "b": price_b},
+        "quantities": {"a": qty_a, "b": qty_b},
+        "status": "OPEN",
+        "pnl": 0
+    }
+    active_pair_trades.append(pair_trade)
+    
+    log_event("PAIR_TRADE", f"Opened {action} on {signal['pair']} | Z={signal.get('z_score', 0):.2f}")
+    
+    return {
+        "success": True,
+        "pair_trade": pair_trade,
+        "trades": [result_a, result_b]
+    }
+
+
+def check_and_close_positions():
+    """Check active pair trades and close if Z-score reverted."""
+    global active_pair_trades
+    
+    closed = []
+    for trade in active_pair_trades:
+        if trade["status"] != "OPEN":
+            continue
+        
+        # Check current Z-score for this pair
+        pair_analysis = cointegration_results.get(trade["pair"])
+        if not pair_analysis:
+            continue
+        
+        current_z = pair_analysis["main_analysis"].get("current_z_score", 0)
+        entry_z = trade["entry_z_score"]
+        
+        # Close conditions:
+        # 1. Z-score crossed zero (mean reversion complete)
+        # 2. Z-score reversed beyond stop-loss
+        should_close = False
+        reason = ""
+        
+        if entry_z < 0 and current_z > -0.5:
+            should_close = True
+            reason = "Mean reversion complete (Z > -0.5)"
+        elif entry_z > 0 and current_z < 0.5:
+            should_close = True
+            reason = "Mean reversion complete (Z < 0.5)"
+        elif abs(current_z) > 4:
+            should_close = True
+            reason = "Stop-loss triggered (|Z| > 4)"
+        
+        if should_close:
+            # Close the positions
+            asset_a = trade["pair"].split("/")[0]
+            asset_b = trade["pair"].split("/")[1]
+            
+            # Reverse the original trades
+            if trade["action"] == "LONG_SPREAD":
+                execute_single_trade(asset_a, "sell", trade["quantities"]["a"], current_prices.get(asset_a, 0))
+                execute_single_trade(asset_b, "buy", trade["quantities"]["b"], current_prices.get(asset_b, 0))
+            else:
+                execute_single_trade(asset_a, "buy", trade["quantities"]["a"], current_prices.get(asset_a, 0))
+                execute_single_trade(asset_b, "sell", trade["quantities"]["b"], current_prices.get(asset_b, 0))
+            
+            trade["status"] = "CLOSED"
+            trade["exit_time"] = ic.time()
+            trade["exit_z_score"] = current_z
+            trade["close_reason"] = reason
+            
+            closed.append(trade["pair"])
+            log_event("PAIR_CLOSE", f"Closed {trade['pair']} | Reason: {reason}")
+    
+    return closed
+
+
+def auto_execute_signals():
+    """Automatically execute trades based on signals if auto-execute is enabled."""
+    global auto_execute_enabled
+    
+    if not auto_execute_enabled:
+        return {"executed": 0, "reason": "Auto-execute disabled"}
+    
+    # First, check and close any positions that should be closed
+    closed = check_and_close_positions()
+    
+    # Then, execute new signals
+    executed = []
+    for signal in detailed_signals:
+        # Only execute HIGH confidence signals
+        if signal.get("confidence_level") != "HIGH":
+            continue
+        
+        # Check if we already have a position in this pair
+        pair = signal["pair"]
+        already_open = any(t["pair"] == pair and t["status"] == "OPEN" for t in active_pair_trades)
+        if already_open:
+            continue
+        
+        # Execute the trade
+        result = execute_pair_trade(signal)
+        if result["success"]:
+            executed.append(pair)
+    
+    return {"executed": len(executed), "closed": len(closed), "trades": executed}
+
+
+# ============================================================================
+# TRADE EXECUTION API ENDPOINTS
+# ============================================================================
+
+@query
+def get_portfolio() -> str:
+    """Get current portfolio state."""
+    calculate_portfolio_value()
+    return json.dumps({
+        "portfolio": portfolio,
+        "positions_count": len(portfolio["positions"]),
+        "active_pair_trades": len([t for t in active_pair_trades if t["status"] == "OPEN"])
+    })
+
+
+@query
+def get_trade_history() -> str:
+    """Get all executed trades."""
+    return json.dumps({
+        "trades": trade_history[-50:],  # Last 50 trades
+        "total_trades": len(trade_history),
+        "pair_trades": active_pair_trades
+    })
+
+
+@query
+def get_active_positions() -> str:
+    """Get current open positions."""
+    calculate_portfolio_value()
+    positions = []
+    for asset, pos in portfolio["positions"].items():
+        current_price = current_prices.get(asset, pos["avg_price"])
+        if pos["side"] == "long":
+            pnl = (current_price - pos["avg_price"]) * pos["quantity"]
+        else:
+            pnl = (pos["avg_price"] - current_price) * pos["quantity"]
+        
+        positions.append({
+            "asset": asset,
+            "side": pos["side"],
+            "quantity": pos["quantity"],
+            "avg_price": pos["avg_price"],
+            "current_price": current_price,
+            "pnl": round(pnl, 2),
+            "pnl_pct": round((pnl / (pos["avg_price"] * pos["quantity"])) * 100, 2)
+        })
+    
+    return json.dumps({"positions": positions})
+
+
+@update
+def execute_trade(asset: str, side: str, amount: float64) -> str:
+    """Manually execute a single trade."""
+    price = current_prices.get(asset.upper())
+    if not price:
+        return json.dumps({"success": False, "error": f"No price for {asset}"})
+    
+    quantity = amount / price
+    result = execute_single_trade(asset.upper(), side.lower(), quantity, price)
+    return json.dumps(result)
+
+
+@update
+def execute_signal(pair: str) -> str:
+    """Execute a specific signal by pair name."""
+    for signal in detailed_signals:
+        if signal["pair"] == pair.upper():
+            result = execute_pair_trade(signal)
+            return json.dumps(result)
+    
+    return json.dumps({"success": False, "error": f"No signal found for {pair}"})
+
+
+@update
+def toggle_auto_execute() -> str:
+    """Toggle automatic trade execution on/off."""
+    global auto_execute_enabled
+    auto_execute_enabled = not auto_execute_enabled
+    return json.dumps({"auto_execute_enabled": auto_execute_enabled})
+
+
+@update
+def run_auto_trading() -> str:
+    """Run one cycle of automatic trading."""
+    result = auto_execute_signals()
+    calculate_portfolio_value()
+    return json.dumps({
+        "result": result,
+        "portfolio": portfolio
+    })
+
+
+@update
+def analyze_and_trade() -> str:
+    """Full cycle: analyze all pairs and auto-execute trades."""
+    # Run analysis
+    analysis_result = run_full_cointegration_analysis()
+    
+    # Auto-execute trades based on signals
+    trade_result = auto_execute_signals()
+    
+    # Update portfolio value
+    calculate_portfolio_value()
+    
+    return json.dumps({
+        "analysis": analysis_result,
+        "trading": trade_result,
+        "portfolio": portfolio,
+        "active_trades": len([t for t in active_pair_trades if t["status"] == "OPEN"])
+    })
+
+
+@update
+def reset_portfolio() -> str:
+    """Reset portfolio to initial state."""
+    global portfolio, trade_history, active_pair_trades
+    portfolio = {
+        "cash": INITIAL_BALANCE,
+        "positions": {},
+        "total_value": INITIAL_BALANCE,
+        "pnl": 0.0,
+        "pnl_pct": 0.0
+    }
+    trade_history = []
+    active_pair_trades = []
+    return json.dumps({"success": True, "portfolio": portfolio})
+
 
