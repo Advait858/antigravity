@@ -46,6 +46,8 @@ coverage.xml
 
 # Translations
 *.mo
+!*.mo
+# Note: *.mo conflicts with Motoko files, so we unignore them
 *.pot
 
 # Environments

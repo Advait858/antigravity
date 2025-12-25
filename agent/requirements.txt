@@ -1,0 +1,9 @@
+# LangChain AI Trading Agent
+# Requirements for the AI agent
+
+langchain>=0.1.0
+langchain-openai>=0.0.5
+openai>=1.0.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+ic-py>=1.0.0

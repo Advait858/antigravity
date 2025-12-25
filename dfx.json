@@ -1,8 +1,8 @@
 {
     "canisters": {
-        "antigravity_bot": {
-            "type": "kybra",
-            "main": "src/main.py"
+        "trading_agent": {
+            "type": "motoko",
+            "main": "src/backend/main.mo"
         }
     },
     "defaults": {

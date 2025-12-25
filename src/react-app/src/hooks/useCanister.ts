@@ -1,8 +1,6 @@
 /**
- * useCanister Hook
- * 
- * Provides connection to ICP canister via @dfinity/agent.
- * Handles Internet Identity authentication.
+ * useCanister Hook - Real ICP Connection
+ * NO MOCKS. Connects to local replica or mainnet.
  */
 
 import { useState, useCallback, useEffect } from 'react';
@@ -10,25 +8,19 @@ import { Actor, HttpAgent, Identity } from '@dfinity/agent';
 import { AuthClient } from '@dfinity/auth-client';
 import { Principal } from '@dfinity/principal';
 
-// Canister configuration
+// Configuration
 const CANISTER_ID = 'bkyz2-fmaaa-aaaaa-qaaaq-cai'; // Local replica default
 const HOST = 'http://127.0.0.1:8080';
 const II_URL = 'https://identity.ic0.app';
 
-// Canister interface (generated from Candid, simplified for demo)
+// Candid Interface (Updated for Iron-Clad)
 const idlFactory = ({ IDL }: { IDL: any }) => {
     return IDL.Service({
+        get_version: IDL.Func([], [IDL.Text], ['query']),
         get_health: IDL.Func([], [IDL.Text], ['query']),
-        get_live_prices: IDL.Func([], [IDL.Text], ['query']),
-        get_trading_signals: IDL.Func([], [IDL.Text], ['query']),
-        get_portfolio: IDL.Func([IDL.Text], [IDL.Text], ['query']),
-        get_active_trades: IDL.Func([], [IDL.Text], ['query']),
-        get_latest_candles: IDL.Func([IDL.Text, IDL.Nat], [IDL.Text], ['query']),
-        register_user: IDL.Func([], [IDL.Text], []),
-        execute_signal_trade: IDL.Func([IDL.Nat, IDL.Float64], [IDL.Text], []),
-        close_trade: IDL.Func([IDL.Nat], [IDL.Text], []),
-        trigger_price_fetch: IDL.Func([], [IDL.Text], []),
-        run_heartbeat_manual: IDL.Func([], [IDL.Text], []),
+        get_dashboard_state: IDL.Func([], [IDL.Text], ['query']),
+        get_cycle_balance: IDL.Func([], [IDL.Text], ['query']),
+        trigger_tick: IDL.Func([], [IDL.Text], []),
     });
 };
 
@@ -49,32 +41,6 @@ export function useCanister(): UseCanisterResult {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isConnected, setIsConnected] = useState(false);
 
-    // Initialize auth client
-    useEffect(() => {
-        const init = async () => {
-            try {
-                const client = await AuthClient.create();
-                setAuthClient(client);
-
-                const isAuth = await client.isAuthenticated();
-                setIsAuthenticated(isAuth);
-
-                if (isAuth) {
-                    const identity = client.getIdentity();
-                    setPrincipal(identity.getPrincipal().toString());
-                    await createActor(identity);
-                } else {
-                    // Create anonymous actor for read-only queries
-                    await createActor();
-                }
-            } catch (err) {
-                console.error('Failed to initialize auth:', err);
-            }
-        };
-
-        init();
-    }, []);
-
     // Create actor with optional identity
     const createActor = async (identity?: Identity) => {
         try {
@@ -83,7 +49,7 @@ export function useCanister(): UseCanisterResult {
                 identity,
             });
 
-            // Fetch root key for local development
+            // Fetch root key for local development (NOT for mainnet!)
             if (process.env.NODE_ENV !== 'production') {
                 await agent.fetchRootKey();
             }
@@ -100,6 +66,33 @@ export function useCanister(): UseCanisterResult {
             setIsConnected(false);
         }
     };
+
+    // Initialize
+    useEffect(() => {
+        const init = async () => {
+            try {
+                const client = await AuthClient.create();
+                setAuthClient(client);
+
+                const isAuth = await client.isAuthenticated();
+                setIsAuthenticated(isAuth);
+
+                if (isAuth) {
+                    const identity = client.getIdentity();
+                    setPrincipal(identity.getPrincipal().toString());
+                    await createActor(identity);
+                } else {
+                    await createActor(); // Anonymous
+                }
+            } catch (err) {
+                console.error('Failed to initialize auth:', err);
+                // Still try to create anonymous actor
+                await createActor();
+            }
+        };
+
+        init();
+    }, []);
 
     // Login with Internet Identity
     const login = useCallback(async () => {
@@ -126,7 +119,7 @@ export function useCanister(): UseCanisterResult {
         await authClient.logout();
         setPrincipal(null);
         setIsAuthenticated(false);
-        await createActor(); // Reset to anonymous
+        await createActor();
     }, [authClient]);
 
     // Query canister (read-only)
@@ -147,15 +140,11 @@ export function useCanister(): UseCanisterResult {
         [actor]
     );
 
-    // Update canister (requires auth for mutations)
+    // Update canister (mutations)
     const updateCanister = useCallback(
         async (method: string, args: any[] = []) => {
             if (!actor) {
                 throw new Error('Actor not initialized');
-            }
-
-            if (!isAuthenticated) {
-                throw new Error('Authentication required');
             }
 
             try {
@@ -166,7 +155,7 @@ export function useCanister(): UseCanisterResult {
                 throw err;
             }
         },
-        [actor, isAuthenticated]
+        [actor]
     );
 
     return {
