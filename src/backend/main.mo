@@ -115,12 +115,18 @@ persistent actor TradingAgent {
     public query func get_logs() : async Text {
         var result = "[";
         var first = true;
-        let start = if (agentLogs.size() > 50) { agentLogs.size() - 50 } else { 0 };
+        let size = agentLogs.size();
+        if (size == 0) { return "[]" };
         
-        for (i in Iter.range(start, agentLogs.size() - 1)) {
-            if (not first) { result #= ","; };
+        let start : Nat = if (size > 50) { size - 50 } else { 0 };
+        let endIdx : Nat = size;
+        
+        var i = start;
+        while (i < endIdx) {
+            if (not first) { result #= "," };
             result #= "\"" # agentLogs[i] # "\"";
             first := false;
+            i += 1;
         };
         
         result # "]"

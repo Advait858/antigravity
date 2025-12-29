@@ -1,5 +1,9 @@
 {
     "canisters": {
+        "oracle": {
+            "type": "motoko",
+            "main": "src/backend/oracle.mo"
+        },
         "trading_agent": {
             "type": "motoko",
             "main": "src/backend/main.mo"
@@ -18,12 +22,6 @@
         "ic": {
             "providers": [
                 "https://ic0.app"
-            ],
-            "type": "persistent"
-        },
-        "playground": {
-            "providers": [
-                "https://icp0.io"
             ],
             "type": "persistent"
         }

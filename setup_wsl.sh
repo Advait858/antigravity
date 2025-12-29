@@ -47,20 +47,26 @@ echo "[4/5] Starting local replica..."
 dfx start --clean --background
 sleep 5
 
-# Step 5: Deploy canister
+# Step 5: Deploy canisters
 echo ""
-echo "[5/5] Deploying antigravity_bot canister..."
-dfx deploy antigravity_bot
+echo "[5/5] Deploying canisters..."
+dfx deploy
 
 echo ""
 echo "========================================"
 echo "  DEPLOYMENT COMPLETE!"
 echo "========================================"
 echo ""
-echo "Canister deployed. You can now:"
-echo "  1. Open http://localhost:3000 in browser (React app)"
-echo "  2. Query canister: dfx canister call antigravity get_health"
+echo "Canisters deployed:"
+echo "  - oracle (HTTPS outcalls)"
+echo "  - trading_agent (trade execution)"
 echo ""
-echo "To trigger the agent manually:"
-echo "  dfx canister call antigravity trigger_tick"
+echo "Test the oracle:"
+echo "  dfx canister call oracle fetch_crypto_prices '(vec {\"bitcoin\"; \"ethereum\"})'"
+echo ""
+echo "Check oracle health:"
+echo "  dfx canister call oracle get_health '()'"
+echo ""
+echo "Run the Python agent:"
+echo "  cd agent && python oracle_agent.py"
 echo ""

@@ -8,98 +8,22 @@ import os
 import json
 import requests
 import subprocess
-import math
 from datetime import datetime, timedelta
 from collections import defaultdict
 
+# Import shared math functions
+from math_core import (
+    EPSILON, mean, variance, std_dev, covariance,
+    OLSResult, ols_regression, adf_test, z_score,
+    calculate_half_life
+)
+
 # Configuration
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-EPSILON = 1e-10
 
 # Assets to trade
 ASSETS = ["BTC", "ETH", "ICP", "SOL", "XRP", "AVAX", "DOT", "LINK", "ADA", "DOGE"]
 PAIRS = [(ASSETS[i], ASSETS[j]) for i in range(len(ASSETS)) for j in range(i+1, len(ASSETS))]
-
-# ============================================================
-# MATH FUNCTIONS (copied from trading_agent.py)
-# ============================================================
-
-def mean(data):
-    if not data: return 0.0
-    return sum(data) / len(data)
-
-def variance(data):
-    n = len(data)
-    if n < 2: return 0.0
-    mu = mean(data)
-    return sum((x - mu) ** 2 for x in data) / (n - 1)
-
-def std_dev(data):
-    return math.sqrt(variance(data))
-
-def covariance(x, y):
-    n = len(x)
-    if n != len(y) or n < 2: return 0.0
-    mu_x, mu_y = mean(x), mean(y)
-    return sum((xi - mu_x) * (yi - mu_y) for xi, yi in zip(x, y)) / (n - 1)
-
-class OLSResult:
-    def __init__(self, beta, alpha, r_squared, residuals):
-        self.beta = beta
-        self.alpha = alpha
-        self.r_squared = r_squared
-        self.residuals = residuals
-
-def ols_regression(y, x):
-    n = len(y)
-    if n != len(x) or n < 2:
-        return OLSResult(0, 0, 0, [])
-    x_mean, y_mean = mean(x), mean(y)
-    num = sum((x[i] - x_mean) * (y[i] - y_mean) for i in range(n))
-    den = sum((x[i] - x_mean) ** 2 for i in range(n))
-    if den < EPSILON:
-        return OLSResult(0, 0, 0, [])
-    beta = num / den
-    alpha = y_mean - beta * x_mean
-    residuals = [y[i] - (alpha + beta * x[i]) for i in range(n)]
-    ss_res = sum(r**2 for r in residuals)
-    ss_tot = sum((y[i] - y_mean)**2 for i in range(n))
-    r_sq = 1 - (ss_res / ss_tot) if ss_tot > EPSILON else 0
-    return OLSResult(beta, alpha, r_sq, residuals)
-
-def adf_test(series):
-    n = len(series)
-    if n < 10:
-        return {"t_stat": 0, "p_value": 1.0, "is_stationary": False}
-    dy = [series[i] - series[i-1] for i in range(1, n)]
-    x_lag = [series[i-1] for i in range(1, n)]
-    res = ols_regression(dy, x_lag)
-    gamma = res.beta
-    sum_res_sq = sum(r*r for r in res.residuals)
-    mean_x = mean(x_lag)
-    sum_sq_x = sum((v - mean_x)**2 for v in x_lag)
-    if sum_sq_x < EPSILON:
-        return {"t_stat": 0, "p_value": 1.0, "is_stationary": False}
-    sigma_sq = sum_res_sq / max(len(x_lag) - 2, 1)
-    se = math.sqrt(sigma_sq / sum_sq_x) if sigma_sq > 0 else 0
-    t_stat = gamma / se if se > EPSILON else 0
-    p_value = 0.01 if t_stat < -3.43 else (0.05 if t_stat < -2.86 else (0.10 if t_stat < -2.57 else 1.0))
-    return {"t_stat": t_stat, "p_value": p_value, "is_stationary": p_value < 0.05}
-
-def z_score(current, history, window=30):
-    if len(history) < 2: return 0
-    data = history[-window:]
-    mu, sigma = mean(data), std_dev(data)
-    return (current - mu) / sigma if sigma > EPSILON else 0
-
-def calculate_half_life(spread):
-    if len(spread) < 10: return 999
-    dy = [spread[i] - spread[i-1] for i in range(1, len(spread))]
-    y_lag = spread[:-1]
-    res = ols_regression(dy, y_lag)
-    if res.beta >= 0 or abs(res.beta) < EPSILON: return 999
-    half_life = -math.log(2) / res.beta
-    return max(1, min(half_life, 999))
 
 # ============================================================
 # DATA FETCHING - 13 MONTHS HOURLY

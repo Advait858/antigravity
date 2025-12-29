@@ -1,7 +1,11 @@
-# Antigravity Bot - Requirements
-# For local development and backtesting
+# Antigravity - Root Requirements
+# For development environment setup
 
-kybra
-numpy
-statsmodels
-pandas
+# Agent Requirements (install from agent/requirements.txt)
+# pip install -r agent/requirements.txt
+
+# React App (install from src/react-app)
+# npm install
+
+# ICP Development
+# Install dfx: sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"

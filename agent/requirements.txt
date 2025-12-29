@@ -1,9 +1,10 @@
-# LangChain AI Trading Agent
-# Requirements for the AI agent
+# Antigravity Agent Requirements
+# Production dependencies for the trading pipeline
 
-langchain>=0.1.0
-langchain-openai>=0.0.5
-openai>=1.0.0
+# HTTP requests
 requests>=2.31.0
+
+# Environment variables
 python-dotenv>=1.0.0
-ic-py>=1.0.0
+
+# Note: No numpy/pandas needed - pure Python math in math_core.py
